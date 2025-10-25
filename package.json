@@ -1,0 +1,14 @@
+{
+  "name": "jsonplaceholder-tests",
+  "version": "1.0.0",
+  "description": "Colección de pruebas CRUD automatizadas con Postman + Newman",
+  "private": true,
+  "scripts": {
+    "test:dev": "set ts=%date:~6,4%%date:~3,2%%date:~0,2%_%time:~0,2%%time:~3,2% && newman run ./jsonplaceholder_tests.postman_collection.json -e ./dev.postman_environment.json -d ./data/posts_data.json --reporters cli,htmlextra --reporter-htmlextra-export ./reports/report_dev_%ts%.html --reporter-htmlextra-title \"API JsonPlaceholder – Dev %ts%\"",
+    "test:qa": "set ts=%date:~6,4%%date:~3,2%%date:~0,2%_%time:~0,2%%time:~3,2% && newman run ./jsonplaceholder_tests.postman_collection.json -e ./qa.postman_environment.json -d ./data/posts_data.json --reporters cli,htmlextra --reporter-htmlextra-export ./reports/report_qa_%ts%.html --reporter-htmlextra-title \"API JsonPlaceholder – QA %ts%\"",
+    "test:prod": "set ts=%date:~6,4%%date:~3,2%%date:~0,2%_%time:~0,2%%time:~3,2% && newman run ./jsonplaceholder_tests.postman_collection.json -e ./prod.postman_environment.json -d ./data/posts_data.json --reporters cli,htmlextra --reporter-htmlextra-export ./reports/report_prod_%ts%.html --reporter-htmlextra-title \"API JsonPlaceholder – Prod %ts%\"",
+    "test:qa-sim": "set ts=%date:~6,4%%date:~3,2%%date:~0,2%_%time:~0,2%%time:~3,2% && newman run ./jsonplaceholder_tests.postman_collection.json -e ./qa_simulated.postman_environment.json --folder \"Negativos\" --reporters cli,htmlextra --reporter-htmlextra-export ./reports/report_qasim_%ts%.html --reporter-htmlextra-title \"API JsonPlaceholder – QA Sim (Negativos) %ts%\"",
+    "test:flow": "newman run ./jsonplaceholder_tests.postman_collection.json -e ./qa.postman_environment.json -d ./data/posts_data.json --folder \"Flow DDT\" --reporters cli,htmlextra --reporter-htmlextra-export ./reports/report_flow.html --reporter-htmlextra-title \"API JsonPlaceholder – Flow DDT\"",
+    "test:all": "npm run test:dev && npm run test:qa && npm run test:qa-sim && npm run test:prod && npm run test:flow"
+  }
+}

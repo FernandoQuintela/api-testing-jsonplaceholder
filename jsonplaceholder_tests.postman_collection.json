@@ -1,0 +1,1117 @@
+{
+	"info": {
+		"_postman_id": "cb503b92-1854-41d5-ab2c-2cc6d2c8f68f",
+		"name": "API JsonPlaceholder – Testing QA",
+		"description": "### **Colección de pruebas CRUD sobre JsonPlaceholder.**\n\n**Valida**: códigos de estado, headers, estructura JSON, tiempos, y flujo POST→PUT→PATCH→DELETE.\n\n**Variables:** {{base_url}}, {{created_post_id}}.\n\n**Nota:** JsonPlaceholder simula persistencia; DELETE y PUT/PATCH no modifican datos reales.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "49435048",
+		"_collection_link": "https://wetechnofreemusic-5122101.postman.co/workspace/we-free-techno's-Workspace~05f082b9-ce85-4f2e-8946-d58aefc9fd0f/collection/49435048-cb503b92-1854-41d5-ab2c-2cc6d2c8f68f?action=share&source=collection_link&creator=49435048"
+	},
+	"item": [
+		{
+			"name": "Auth Smoke",
+			"item": [
+				{
+					"name": "postman-echo.com/headers",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"const j = pm.response.json();\r",
+									"const auth = (j.headers.authorization || \"\");\r",
+									"\r",
+									"pm.test(\"Server recibió header Authorization\", () => auth.startsWith(\"Bearer \"));\r",
+									"pm.test(\"Authorization coincide con mi environment token\", () => auth === pm.environment.get(\"token\"));\r",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {},
+								"requests": {}
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "https://postman-echo.com/headers",
+							"protocol": "https",
+							"host": [
+								"postman-echo",
+								"com"
+							],
+							"path": [
+								"headers"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Flow DDT",
+			"item": [
+				{
+					"name": "/posts (DDT)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Datos de iteración\r",
+									"const it = pm.iterationData;\r",
+									"const expectStatus = Number(it.get(\"expectStatus\") || 201);\r",
+									"\r",
+									"// 1) Status\r",
+									"pm.test(`Status esperado = ${expectStatus} (${it.get(\"case\")})`, () => {\r",
+									"  pm.expect(pm.response.code).to.eql(expectStatus);\r",
+									"});\r",
+									"\r",
+									"// 2) Parseo único\r",
+									"let resBody;\r",
+									"pm.test(\"Respuesta es JSON parseable\", () => {\r",
+									"  resBody = pm.response.json();\r",
+									"  pm.expect(resBody).to.be.an(\"object\");\r",
+									"});\r",
+									"\r",
+									"// 3) Básicos\r",
+									"pm.test(\"Incluye claves mínimas\", () =>\r",
+									"  [\"userId\",\"id\",\"title\",\"body\"].every(k => k in resBody)\r",
+									");\r",
+									"pm.test(\"Tipos correctos\", () =>\r",
+									"  typeof resBody.userId === \"number\" &&\r",
+									"  typeof resBody.id     === \"number\" &&\r",
+									"  typeof resBody.title  === \"string\" &&\r",
+									"  typeof resBody.body   === \"string\"\r",
+									");\r",
+									"\r",
+									"// 4) Correlación con lo enviado (opcional)\r",
+									"const sentUserId = Number(it.get(\"userId\"));\r",
+									"const sentTitle  = it.get(\"title\");\r",
+									"const sentBody   = it.get(\"body\");\r",
+									"pm.test(\"Correlación userId/title/body con lo enviado\", () => {\r",
+									"  const okUser  = Number.isNaN(sentUserId) ? true : resBody.userId === sentUserId;\r",
+									"  const okTitle = sentTitle === undefined ? true : resBody.title === sentTitle;\r",
+									"  const okBody  = sentBody  === undefined ? true : resBody.body  === sentBody;\r",
+									"  return okUser && okTitle && okBody;\r",
+									"});\r",
+									"\r",
+									"// 5) Schema parametrizable (usa expectSchemaOk si lo pusiste en el JSON)\r",
+									"const schemaVar = pm.collectionVariables.get(\"postsSchema\");\r",
+									"if (schemaVar) {\r",
+									"  const schema = JSON.parse(schemaVar);\r",
+									"  const wantOk = String(it.get(\"expectSchemaOk\")).toLowerCase() !== \"false\";\r",
+									"\r",
+									"  if (wantOk) {\r",
+									"    pm.test(\"Cumple JSON Schema (posts)\", () => {\r",
+									"      pm.expect(resBody).to.have.jsonSchema(schema);\r",
+									"    });\r",
+									"  } else {\r",
+									"    pm.test(\"Schema falla como se esperaba (caso negativo)\", () => {\r",
+									"      let threw = false;\r",
+									"      try { pm.expect(resBody).to.have.jsonSchema(schema); } catch { threw = true; }\r",
+									"      pm.expect(threw, \"el schema NO debería validar este caso\").to.be.true;\r",
+									"    });\r",
+									"  }\r",
+									"}\r",
+									"\r",
+									"// 6) ID para el flujo (JsonPlaceholder no persiste: usamos 101, que responde PATCH/DELETE)\r",
+									"pm.variables.set(\"flow_id\", \"101\");\r",
+									"\r",
+									"// 7) Payload del PATCH (dinámico por iteración)\r",
+									"pm.variables.set(\"patch_title\", `Título parcheado ${it.get(\"case\")}`);\r",
+									"\r",
+									"// 8) Saltar a PATCH\r",
+									"postman.setNextRequest(\"PATCH /posts (DDT)\");\r",
+									"\r",
+									"// El RETRY HANDLER\r",
+									"const code = pm.response.code;\r",
+									"\r",
+									"// si no es 200 ni 201, reintentar\r",
+									"if (![200, 201].includes(code)) {\r",
+									"    const currentRetry = parseInt(pm.variables.get(\"retry_count\")) || 0;\r",
+									"    const nextTry = currentRetry + 1;\r",
+									"    console.warn(`⚠️ Intento ${nextTry} fallido con código ${code}. Reintentando...`);\r",
+									"    pm.variables.set(\"retry_count\", nextTry);\r",
+									"\r",
+									"    // volver a ejecutar el mismo request\r",
+									"    postman.setNextRequest(pm.info.requestName);\r",
+									"} else {\r",
+									"    // si todo salió bien, se resetea el contador y sigue normal\r",
+									"    pm.variables.unset(\"retry_count\");\r",
+									"}\r",
+									"\r",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {},
+								"requests": {}
+							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Reintentar por si hay un 502 temporal o 500 que desaparece\r",
+									"const maxRetries = 3; // cantidad de intentos máximos\r",
+									"const currentRetry = pm.variables.get(\"retry_count\") ? parseInt(pm.variables.get(\"retry_count\")) : 0;\r",
+									"\r",
+									"// Si ya falló varias veces, que no siga\r",
+									"if (currentRetry >= maxRetries) {\r",
+									"    console.warn(`❌ Request falló ${maxRetries} veces, abortando...`);\r",
+									"    postman.setNextRequest(null);\r",
+									"} else {\r",
+									"    // guardo el contador actualizado (por seguridad)\r",
+									"    pm.variables.set(\"retry_count\", currentRetry);\r",
+									"}\r",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {},
+								"requests": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"userId\": {{userId}},\r\n  \"title\": \"{{title}}\",\r\n  \"body\": \"{{body}}\"\r\n}\r\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/posts",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"posts"
+							]
+						},
+						"description": "Crea recurso simulado. Tests: 201, claves mínimas, tipos. Guarda {{created_post_id}}."
+					},
+					"response": []
+				},
+				{
+					"name": "/posts (DDT)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"function jsonSafe(r){ try{return r.json();}catch{return null;} }\r",
+									"const res = jsonSafe(pm.response);\r",
+									"const id  = pm.variables.get(\"flow_id\");\r",
+									"const sentTitle = pm.variables.get(\"patch_title\");\r",
+									"\r",
+									"// 1) Status + parseo\r",
+									"pm.test(\"200 OK en PATCH\", () => pm.response.code === 200);\r",
+									"pm.test(\"Respuesta parseable\", () => res !== null);\r",
+									"\r",
+									"// 2) Básicos del recurso\r",
+									"pm.test(\"Incluye claves mínimas\", () => res && [\"userId\",\"id\",\"title\",\"body\"].every(k => k in res));\r",
+									"pm.test(\"ID consistente (path = response)\", () => res && String(res.id) === String(id));\r",
+									"\r",
+									"// 3) Cambios esperados\r",
+									"pm.test(\"Title actualizado\", () => res && res.title === sentTitle);\r",
+									"\r",
+									"// 4) Schema condicional (full si viene completo, sino parcial)\r",
+									"const full = res && [\"userId\",\"id\",\"title\",\"body\"].every(k => k in res);\r",
+									"if (full) {\r",
+									"  const sv = pm.collectionVariables.get(\"postsSchema\");\r",
+									"  if (sv) pm.test(\"PATCH cumple schema completo\", () => pm.expect(res).to.have.jsonSchema(JSON.parse(sv)));\r",
+									"} else {\r",
+									"  const patchSchema = {\r",
+									"    type: \"object\",\r",
+									"    properties: {\r",
+									"      userId: { type: \"number\", minimum: 1 },\r",
+									"      id:     { type: \"number\", minimum: 1 },\r",
+									"      title:  { type: \"string\", minLength: 1 },\r",
+									"      body:   { type: \"string\", minLength: 1 }\r",
+									"    },\r",
+									"    additionalProperties: true\r",
+									"  };\r",
+									"  pm.test(\"PATCH cumple schema parcial\", () => pm.expect(res).to.have.jsonSchema(patchSchema));\r",
+									"}\r",
+									"\r",
+									"// 5) Ir a DELETE\r",
+									"postman.setNextRequest(\"DELETE /posts (DDT)\");\r",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {},
+								"requests": {}
+							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Guardar el payload que vas a mandar (para comparar luego)\r",
+									"pm.variables.set(\"patch_payload_raw\", pm.request.body?.raw || \"{}\");\r",
+									"\r",
+									"// Traer el recurso actual antes del PATCH\r",
+									"const base = pm.variables.get(\"base_url\");\r",
+									"const id = pm.variables.get(\"created_post_id\");\r",
+									"\r",
+									"pm.sendRequest({\r",
+									"  url: `${base}/posts/${id}`,\r",
+									"  method: \"GET\"\r",
+									"}, (err, res) => {\r",
+									"  try {\r",
+									"    if (err) { console.warn(\"No se pudo traer el recurso previo:\", err); return; }\r",
+									"    const obj = res.json();\r",
+									"    pm.variables.set(\"orig_userId\", obj.userId);\r",
+									"    pm.variables.set(\"orig_title\", obj.title);\r",
+									"    pm.variables.set(\"orig_body\",  obj.body);\r",
+									"  } catch (e) {\r",
+									"    console.warn(\"No se pudo parsear el recurso previo:\", e.message);\r",
+									"  }\r",
+									"});\r",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {},
+								"requests": {}
+							}
+						}
+					],
+					"request": {
+						"method": "PATCH",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{ \"title\": \"{{patch_title}}\" }\r\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/posts/{{flow_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"posts",
+								"{{flow_id}}"
+							]
+						},
+						"description": "Actualiza parcial. Tests: 200, id estable, title actualizado."
+					},
+					"response": []
+				},
+				{
+					"name": "/posts (DDT)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// 1) Status\r",
+									"pm.test(\"Borrado aceptado (200 o 204)\", () => [200,204].includes(pm.response.code));\r",
+									"\r",
+									"// 2) Content-Type tolerante\r",
+									"pm.test(\"Content-Type JSON o ausente\", () => {\r",
+									"  const ct = pm.response.headers.get(\"Content-Type\");\r",
+									"  return !ct || ct.toLowerCase().includes(\"application/json\");\r",
+									"});\r",
+									"\r",
+									"// 3) Body vacío o {} / []\r",
+									"pm.test(\"Body vacío o nulo\", () => {\r",
+									"  let txt = \"\";\r",
+									"  try { txt = pm.response.text(); } catch {}\r",
+									"  txt = String(txt || \"\").trim();\r",
+									"  if (!txt) return true;\r",
+									"  try {\r",
+									"    const p = JSON.parse(txt);\r",
+									"    if (Array.isArray(p)) return p.length === 0;\r",
+									"    if (p && typeof p === \"object\") return Object.keys(p).length === 0;\r",
+									"    return false;\r",
+									"  } catch { return false; }\r",
+									"});\r",
+									"\r",
+									"// 4) Fin de la iteración\r",
+									"console.log(\"Fin del flujo DDT para este caso\");\r",
+									"postman.setNextRequest(null);\r",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {},
+								"requests": {}
+							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript",
+								"packages": {},
+								"requests": {}
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": ""
+						},
+						"url": {
+							"raw": "{{base_url}}/posts/{{flow_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"posts",
+								"{{flow_id}}"
+							]
+						},
+						"description": "Borrado simulado. Tests: 200/204."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Negativos",
+			"item": [
+				{
+					"name": "New Request",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Armar payload desde el dataset (tipos intactos)\r",
+									"const payload = {\r",
+									"  userId: pm.iterationData.get(\"userId\"),\r",
+									"  title: pm.iterationData.get(\"title\"),\r",
+									"  body:  pm.iterationData.get(\"body\")\r",
+									"};\r",
+									"pm.variables.set(\"neg_payload\", JSON.stringify(payload));\r",
+									"\r",
+									"// Guardar lo esperado (por si el dataset no lo trae)\r",
+									"const expected = Number(pm.iterationData.get(\"expect\")) || 422;\r",
+									"pm.variables.set(\"neg_expected\", String(expected));\r",
+									"\r",
+									"// Por prolijidad, tag de caso en consola\r",
+									"console.log(\"🧪 Negativo:\", pm.iterationData.get(\"case\"));\r",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {},
+								"requests": {}
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Util\r",
+									"function parseSafe(resp) { try { return resp.json(); } catch { return null; } }\r",
+									"\r",
+									"const expected = Number(pm.variables.get(\"neg_expected\")) || 422;\r",
+									"const code = pm.response.code;\r",
+									"const obj  = parseSafe(pm.response);\r",
+									"\r",
+									"// 1) Debe ser rechazo (4xx). Aceptamos 400/422; si no, se marca como bug.\r",
+									"pm.test(\"Status de rechazo (400/422)\", () => [400, 422].includes(code));\r",
+									"\r",
+									"// 2) Nunca debe “crear” un recurso: no debe haber id numérico en la respuesta.\r",
+									"pm.test(\"No se creó un recurso (sin id numérico)\", () => !(obj && typeof obj.id === \"number\"));\r",
+									"\r",
+									"// 3) Si hay payload de error, que tenga algo mínimamente útil\r",
+									"pm.test(\"Error payload útil (message/error/errors)\", () => {\r",
+									"  if (!obj || typeof obj !== \"object\") return true; // si no hay body, no se exige\r",
+									"  const hasMessage = typeof obj.message === \"string\" && obj.message.trim().length > 0;\r",
+									"  const hasError   = typeof obj.error   === \"string\" && obj.error.trim().length > 0;\r",
+									"  const hasErrors  = Array.isArray(obj.errors) && obj.errors.length > 0;\r",
+									"  return hasMessage || hasError || hasErrors;\r",
+									"});\r",
+									"\r",
+									"// 4) Si no vino 4xx, queda la constancia bien clara (esto en real sería bug)\r",
+									"if (![400, 422].includes(code)) {\r",
+									"  console.warn(\r",
+									"    \"⚠️ Esperaba 4xx y vino\", code,\r",
+									"    \"→ el backend aceptó datos inválidos (falta validación del lado servidor).\"\r",
+									"  );\r",
+									"}\r",
+									"\r",
+									"// 5) (Opcional) Validación local del request como “contrato de entrada”\r",
+									"const req = JSON.parse(pm.variables.get(\"neg_payload\") || \"{}\");\r",
+									"pm.test(\"Validación local de entrada (min)\", () => {\r",
+									"  // Reglas mínimas: title >= 1 char, body >= 10 char, userId number >=1\r",
+									"  const okTitle = typeof req.title === \"string\" && req.title.trim().length >= 1;\r",
+									"  const okBody  = typeof req.body  === \"string\" && req.body.trim().length  >= 10;\r",
+									"  const okUser  = typeof req.userId === \"number\" && req.userId >= 1;\r",
+									"\r",
+									"  // Este test debe FALLAR en negativos (porque justamente son inválidos).\r",
+									"  // Lo invierto para que en negativos pase cuando encuentra el problema.\r",
+									"  return !(okTitle && okBody && okUser);\r",
+									"});\r",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {},
+								"requests": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{{neg_payload}}\r\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/posts (negativos)",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"posts (negativos)"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "/posts",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"// 1) Status y performance\r",
+							"pm.test(\"Status 200 OK\", () => pm.response.code === 200);\r",
+							"pm.test(\"Tiempo de respuesta aceptable (<1500 ms)\", () => pm.response.responseTime < 1500);\r",
+							"\r",
+							"// 2) Headers\r",
+							"pm.test(\"Content-Type es JSON\", () => {\r",
+							"  const ct = pm.response.headers.get(\"Content-Type\") || \"\";\r",
+							"  return ct.toLowerCase().includes(\"application/json\");\r",
+							"});\r",
+							"\r",
+							"// 3) Estructura del body\r",
+							"let posts = [];\r",
+							"try { posts = pm.response.json(); } catch { posts = []; }\r",
+							"\r",
+							"pm.test(\"Body es un array con 100 items\", () => Array.isArray(posts) && posts.length === 100);\r",
+							"\r",
+							"pm.test(\"Cada item tiene las claves mínimas\", () =>\r",
+							"  Array.isArray(posts) && posts.every(p => [\"userId\", \"id\", \"title\", \"body\"].every(k => k in p))\r",
+							");\r",
+							"\r",
+							"pm.test(\"Cada post tiene título y cuerpo con texto\", () =>\r",
+							"  Array.isArray(posts) && posts.every(p => String(p.title).trim().length > 0 && String(p.body).trim().length > 0)\r",
+							");\r",
+							"\r",
+							"pm.test(\"Tipos correctos por campo\", () =>\r",
+							"  Array.isArray(posts) && posts.every(p =>\r",
+							"    typeof p.userId === \"number\" &&\r",
+							"    typeof p.id === \"number\" &&\r",
+							"    typeof p.title === \"string\" &&\r",
+							"    typeof p.body === \"string\"\r",
+							"  )\r",
+							");\r",
+							"\r",
+							"// Guardar un id para otros requests (si hay posts)\r",
+							"if (Array.isArray(posts) && posts.length > 0) {\r",
+							"  pm.collectionVariables.set(\"first_post_id\", posts[0].id);\r",
+							"  console.log(\"Primer post:\", posts[0]);\r",
+							"}\r",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {},
+						"requests": {}
+					}
+				},
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							""
+						],
+						"type": "text/javascript",
+						"packages": {},
+						"requests": {}
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/posts",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"posts"
+					]
+				},
+				"description": "Lista 100 posts. Tests: 200, <1s, headers, estructura y tipos."
+			},
+			"response": []
+		},
+		{
+			"name": "/posts",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"// Datos de la iteración (JSON del -d)\r",
+							"const iter = pm.iterationData;\r",
+							"const expectedStatus = Number(iter.get(\"expectStatus\") || 201);\r",
+							"const sentUserId = Number(iter.get(\"userId\"));\r",
+							"const sentTitle  = iter.get(\"title\");\r",
+							"const sentBody   = iter.get(\"body\");\r",
+							"\r",
+							"// 1) Status parametrizado\r",
+							"pm.test(`Status esperado = ${expectedStatus} (${iter.get(\"case\")})`, () => {\r",
+							"  pm.expect(pm.response.code).to.eql(expectedStatus);\r",
+							"});\r",
+							"\r",
+							"// 2) Parseo UNA vez\r",
+							"let resBody;\r",
+							"pm.test(\"Respuesta es JSON parseable\", () => {\r",
+							"  resBody = pm.response.json();\r",
+							"  pm.expect(resBody).to.be.an(\"object\");\r",
+							"});\r",
+							"\r",
+							"// 3) Claves mínimas\r",
+							"pm.test(\"Incluye claves mínimas\", () =>\r",
+							"  [\"userId\",\"id\",\"title\",\"body\"].every(k => k in resBody)\r",
+							");\r",
+							"\r",
+							"// 4) Tipos\r",
+							"pm.test(\"Tipos correctos\", () =>\r",
+							"  typeof resBody.userId === \"number\" &&\r",
+							"  typeof resBody.id     === \"number\" &&\r",
+							"  typeof resBody.title  === \"string\" &&\r",
+							"  typeof resBody.body   === \"string\"\r",
+							");\r",
+							"\r",
+							"// 5) Correlación con lo enviado (solo si mandaste valor)\r",
+							"pm.test(\"Correlación userId/title/body con lo enviado\", () => {\r",
+							"  const okUser  = Number.isNaN(sentUserId) ? true : resBody.userId === sentUserId;\r",
+							"  const okTitle = sentTitle === undefined ? true : resBody.title === sentTitle;\r",
+							"  const okBody  = sentBody  === undefined ? true : resBody.body  === sentBody;\r",
+							"  return okUser && okTitle && okBody;\r",
+							"});\r",
+							"\r",
+							"// 6) Schema (positivo o negativo según data y guardado en colección).\r",
+							"const schemaVar = pm.collectionVariables.get(\"postsSchema\");\r",
+							"if (schemaVar) {\r",
+							"  const schema = JSON.parse(schemaVar);\r",
+							"  const wantOk = String(pm.iterationData.get(\"expectSchemaOk\")).toLowerCase() !== \"false\";\r",
+							"\r",
+							"  if (wantOk) {\r",
+							"    pm.test(\"Cumple JSON Schema (posts)\", () => {\r",
+							"      pm.expect(resBody).to.have.jsonSchema(schema);\r",
+							"    });\r",
+							"  } else {\r",
+							"    pm.test(\"Schema falla como se esperaba (título vacío)\", () => {\r",
+							"      let threw = false;\r",
+							"      try {\r",
+							"        pm.expect(resBody).to.have.jsonSchema(schema);\r",
+							"      } catch (e) {\r",
+							"        threw = true;\r",
+							"        // opcional: chequeo del motivo\r",
+							"        pm.expect((e.message || \"\")).to.include(\"should NOT be shorter\");\r",
+							"      }\r",
+							"      pm.expect(threw, \"el schema NO debería validar este caso negativo\").to.be.true;\r",
+							"    });\r",
+							"  }\r",
+							"}\r",
+							"\r",
+							"// 7) Guarda id para encadenar\r",
+							"pm.variables.set(\"created_post_id\", String(resBody.id));\r",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {},
+						"requests": {}
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"userId\": {{userId}},\r\n  \"title\": \"{{title}}\",\r\n  \"body\": \"{{body}}\"\r\n}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{base_url}}/posts",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"posts"
+					]
+				},
+				"description": "Crea recurso simulado. Tests: 201, claves mínimas, tipos. Guarda {{created_post_id}}."
+			},
+			"response": []
+		},
+		{
+			"name": "/posts",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"// 0) Utilidades\r",
+							"function jsonSafe(resp) { try { return resp.json(); } catch { return null; } }\r",
+							"\r",
+							"// 1) Datos de request/response\r",
+							"const res = jsonSafe(pm.response);\r",
+							"const pathId = Number(pm.variables.get(\"created_post_id\")); // viene de la colección\r",
+							"\r",
+							"let sent = {};\r",
+							"try { sent = JSON.parse(pm.request.body?.raw || \"{}\"); }\r",
+							"catch (e) { console.warn(\"Body del PUT no es JSON válido:\", e.message); }\r",
+							"\r",
+							"// 2) Status + headers\r",
+							"pm.test(\"Status 200 OK en update\", () => pm.response.code === 200);\r",
+							"pm.test(\"Response Content-Type = JSON\", () =>\r",
+							"  (pm.response.headers.get(\"Content-Type\") || \"\").toLowerCase().includes(\"application/json\")\r",
+							");\r",
+							"pm.test(\"Respuesta es JSON parseable\", () => res !== null);\r",
+							"\r",
+							"// 3) Estructura mínima + schema (opcional, mismo que posts)\r",
+							"pm.test(\"Incluye claves mínimas\", () => res && [\"userId\",\"id\",\"title\",\"body\"].every(k => k in res));\r",
+							"\r",
+							"const schemaVar = pm.collectionVariables.get(\"postsSchema\");\r",
+							"if (schemaVar && res) {\r",
+							"  const schema = JSON.parse(schemaVar);\r",
+							"  pm.test(\"Cumple JSON Schema (posts)\", () => pm.expect(res).to.have.jsonSchema(schema));\r",
+							"}\r",
+							"\r",
+							"// 4) Consistencia de IDs (path, body, response)\r",
+							"pm.test(\"ID del recurso consistente (path = body = response)\", () => {\r",
+							"  const bodyIdOk = sent.id === undefined || Number(sent.id) === pathId; // se permite body sin id\r",
+							"  return res && Number(res.id) === pathId && bodyIdOk;\r",
+							"});\r",
+							"\r",
+							"// 5) Correlación con lo enviado (PUT reemplaza todo)\r",
+							"pm.test(\"Se actualizaron los valores enviados (title/body)\", () =>\r",
+							"  res && sent &&\r",
+							"  typeof sent.title === \"string\" &&\r",
+							"  typeof sent.body  === \"string\" &&\r",
+							"  res.title === sent.title &&\r",
+							"  res.body  === sent.body\r",
+							");\r",
+							"\r",
+							"// 6) No alteró el userId (regla común en PUTs)\r",
+							"pm.test(\"userId se mantiene\", () =>\r",
+							"  res && sent && typeof sent.userId === \"number\" ? res.userId === sent.userId : true\r",
+							");\r",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {},
+						"requests": {}
+					}
+				},
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							""
+						],
+						"type": "text/javascript",
+						"packages": {},
+						"requests": {}
+					}
+				}
+			],
+			"request": {
+				"method": "PUT",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"userId\": 101,\r\n  \"title\": \"Post modificado desde Postman\",\r\n  \"body\": \"Actualización completa para práctica QA\"\r\n}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{base_url}}/posts/{{created_post_id}}",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"posts",
+						"{{created_post_id}}"
+					]
+				},
+				"description": "Reemplaza recurso completo. Tests: 200, id coincide, campos actualizados."
+			},
+			"response": []
+		},
+		{
+			"name": "/posts",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"// Utilidades\r",
+							"function jsonSafe(resp) { try { return resp.json(); } catch { return null; } }\r",
+							"\r",
+							"const res = jsonSafe(pm.response);\r",
+							"const pathId = Number(pm.variables.get(\"created_post_id\"));\r",
+							"\r",
+							"// Payload enviado (lo que parcho)\r",
+							"let sent = {};\r",
+							"let parseOk = true;\r",
+							"try { sent = JSON.parse(pm.variables.get(\"patch_payload_raw\") || \"{}\"); }\r",
+							"catch (e) { parseOk = false; console.warn(\"Patch payload inválido:\", e.message); }\r",
+							"\r",
+							"// 1) Status y headers\r",
+							"pm.test(\"200 OK en PATCH\", () => pm.response.code === 200);\r",
+							"pm.test(\"Response Content-Type = JSON\", () =>\r",
+							"  (pm.response.headers.get(\"Content-Type\") || \"\").toLowerCase().includes(\"application/json\")\r",
+							");\r",
+							"pm.test(\"Respuesta parseable\", () => res !== null);\r",
+							"\r",
+							"// 2) Estructura mínima y consistencia de ID\r",
+							"pm.test(\"Incluye claves mínimas\", () => res && [\"userId\",\"id\",\"title\",\"body\"].every(k => k in res));\r",
+							"pm.test(\"ID consistente (path = response)\", () => res && Number(res.id) === pathId);\r",
+							"\r",
+							"// 3) Correlación: solo cambian los campos enviados\r",
+							"if (parseOk && res) {\r",
+							"  // Si envié title, debe coincidir; si no lo envié, debe quedar igual que antes\r",
+							"  const origTitle = pm.variables.get(\"orig_title\");\r",
+							"  const origBody  = pm.variables.get(\"orig_body\");\r",
+							"  const origUser  = Number(pm.variables.get(\"orig_userId\"));\r",
+							"\r",
+							"  pm.test(\"Title actualizado solo si fue enviado\", () => {\r",
+							"    if (typeof sent.title === \"string\") return res.title === sent.title;\r",
+							"    return res.title === origTitle;\r",
+							"  });\r",
+							"\r",
+							"  pm.test(\"Body se mantiene si no fue enviado\", () => {\r",
+							"    if (typeof sent.body === \"string\") return res.body === sent.body;\r",
+							"    return res.body === origBody;\r",
+							"  });\r",
+							"\r",
+							"  pm.test(\"userId permanece igual (regla común)\", () => {\r",
+							"    if (typeof sent.userId === \"number\") return res.userId === sent.userId;\r",
+							"    return res.userId === origUser;\r",
+							"  });\r",
+							"}\r",
+							"\r",
+							"// 4) Validación por schema (full vs parcial)\r",
+							"const fullKeys = [\"userId\",\"id\",\"title\",\"body\"];\r",
+							"const hasAll = res && fullKeys.every(k => k in res);\r",
+							"\r",
+							"if (hasAll) {\r",
+							"  pm.test(\"PATCH cumple schema completo (respuesta full)\", () => {\r",
+							"    const schemaVar = pm.collectionVariables.get(\"postsSchema\");\r",
+							"    if (!schemaVar) {\r",
+							"      console.warn(\"postsSchema no definido; se valida con schema parcial por fallback\");\r",
+							"      // Fallback: parcial\r",
+							"      pm.expect(res).to.have.jsonSchema({\r",
+							"        type: \"object\",\r",
+							"        properties: {\r",
+							"          userId: { type: \"number\", minimum: 1 },\r",
+							"          id:     { type: \"number\", minimum: 1 },\r",
+							"          title:  { type: \"string\",  minLength: 1 },\r",
+							"          body:   { type: \"string\",  minLength: 1 }\r",
+							"        },\r",
+							"        additionalProperties: true\r",
+							"      });\r",
+							"      return true;\r",
+							"    }\r",
+							"    let schema;\r",
+							"    try { schema = JSON.parse(schemaVar); }\r",
+							"    catch (e) {\r",
+							"      console.warn(\"postsSchema inválido:\", e.message);\r",
+							"      return false;\r",
+							"    }\r",
+							"    pm.expect(res).to.have.jsonSchema(schema);\r",
+							"    return true;\r",
+							"  });\r",
+							"} else {\r",
+							"  pm.test(\"PATCH cumple schema parcial (respuesta mínima)\", () => {\r",
+							"    pm.expect(res).to.have.jsonSchema({\r",
+							"      type: \"object\",\r",
+							"      properties: {\r",
+							"        userId: { type: \"number\", minimum: 1 },\r",
+							"        id:     { type: \"number\", minimum: 1 },\r",
+							"        title:  { type: \"string\",  minLength: 1 },\r",
+							"        body:   { type: \"string\",  minLength: 1 }\r",
+							"      },\r",
+							"      additionalProperties: true\r",
+							"    });\r",
+							"  });\r",
+							"}\r",
+							"\r",
+							"\r",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {},
+						"requests": {}
+					}
+				},
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"// Guardar el payload que vas a mandar (para comparar luego)\r",
+							"pm.variables.set(\"patch_payload_raw\", pm.request.body?.raw || \"{}\");\r",
+							"\r",
+							"// Traer el recurso actual antes del PATCH\r",
+							"const base = pm.variables.get(\"base_url\");\r",
+							"const id = pm.variables.get(\"created_post_id\");\r",
+							"\r",
+							"pm.sendRequest({\r",
+							"  url: `${base}/posts/${id}`,\r",
+							"  method: \"GET\"\r",
+							"}, (err, res) => {\r",
+							"  try {\r",
+							"    if (err) { console.warn(\"No se pudo traer el recurso previo:\", err); return; }\r",
+							"    const obj = res.json();\r",
+							"    pm.variables.set(\"orig_userId\", obj.userId);\r",
+							"    pm.variables.set(\"orig_title\", obj.title);\r",
+							"    pm.variables.set(\"orig_body\",  obj.body);\r",
+							"  } catch (e) {\r",
+							"    console.warn(\"No se pudo parsear el recurso previo:\", e.message);\r",
+							"  }\r",
+							"});\r",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {},
+						"requests": {}
+					}
+				}
+			],
+			"request": {
+				"method": "PATCH",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"title\": \"Título parcheado {{$timestamp}}\"\r\n}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{base_url}}/posts/{{created_post_id}}",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"posts",
+						"{{created_post_id}}"
+					]
+				},
+				"description": "Actualiza parcial. Tests: 200, id estable, title actualizado."
+			},
+			"response": []
+		},
+		{
+			"name": "/posts",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"// 1) Status esperado\r",
+							"pm.test(\"Borrado aceptado (200 o 204)\", () =>\r",
+							"  [200, 204].includes(pm.response.code)\r",
+							");\r",
+							"\r",
+							"// 2) Content-Type correcto (si existe)\r",
+							"pm.test(\"Content-Type es JSON o no devuelto (válido en DELETE)\", () => {\r",
+							"  const ct = pm.response.headers.get(\"Content-Type\");\r",
+							"  return !ct || ct.toLowerCase().includes(\"application/json\");\r",
+							"});\r",
+							"\r",
+							"// 3) Body vacío o \"vacío válido\"\r",
+							"pm.test(\"Body vacío o nulo (DELETE no devuelve datos)\", () => {\r",
+							"  // En Newman, pm.response.text() puede no estar disponible\r",
+							"  let txt = \"\";\r",
+							"  try { txt = pm.response.text(); } catch (e) { txt = \"\"; }\r",
+							"\r",
+							"  txt = String(txt || \"\").trim();\r",
+							"  if (!txt) return true; // vacío: ok\r",
+							"\r",
+							"  // Si vino algo, aceptamos {} o [] vacíos\r",
+							"  try {\r",
+							"    const parsed = JSON.parse(txt);\r",
+							"    if (Array.isArray(parsed)) return parsed.length === 0;\r",
+							"    if (parsed && typeof parsed === \"object\") return Object.keys(parsed).length === 0;\r",
+							"    return false;\r",
+							"  } catch {\r",
+							"    return false; // texto no JSON: no debería\r",
+							"  }\r",
+							"});\r",
+							"\r",
+							"// 4) Log en consola\r",
+							"console.log(\"DELETE ejecutado. Status:\", pm.response.code);\r",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {},
+						"requests": {}
+					}
+				},
+				{
+					"listen": "prerequest",
+					"script": {
+						"packages": {},
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": ""
+				},
+				"url": {
+					"raw": "{{base_url}}/posts/{{created_post_id}}",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"posts",
+						"{{created_post_id}}"
+					]
+				},
+				"description": "Borrado simulado. Tests: 200/204."
+			},
+			"response": []
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{token}}",
+				"type": "string"
+			}
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"requests": {},
+				"exec": [
+					"// --- Token mock con expiración simple (5 min) ---\r",
+					"const now = Math.floor(Date.now() / 1000);\r",
+					"const exp = parseInt(pm.environment.get(\"token_exp\") || \"0\", 10);\r",
+					"let token = pm.environment.get(\"token\");\r",
+					"\r",
+					"if (!token || now >= exp) {\r",
+					"  // Dinámicos. De Postman, cambia siempre.\r",
+					"  const uniq = pm.variables.replaceIn(\"{{$timestamp}}-{{$guid}}\");\r",
+					"  token = `Bearer demo-${pm.environment.name}-${uniq}`;\r",
+					"\r",
+					"  pm.environment.set(\"token\", token);\r",
+					"  pm.environment.set(\"token_exp\", now + 300); // 5 minutos\r",
+					"  console.log(\"Nuevo token mock generado:\", token);\r",
+					"} else {\r",
+					"  console.log(\"Reuso token mock del environment.\");\r",
+					"}\r",
+					"\r",
+					"/* Si hay API real que entregue un token\r",
+					"\r",
+					"if (!pm.environment.get(\"token\") || Date.now() > (+pm.environment.get(\"token_exp_ms\") || 0)) {\r",
+					"  pm.sendRequest({\r",
+					"    url: pm.environment.get(\"auth_url\"),          // ej: https://api.empresa.com/auth/login\r",
+					"    method: \"POST\",\r",
+					"    header: { \"Content-Type\": \"application/json\" },\r",
+					"    body: {\r",
+					"      mode: \"raw\",\r",
+					"      raw: JSON.stringify({\r",
+					"        username: pm.environment.get(\"user\"),\r",
+					"        password: pm.environment.get(\"pass\")\r",
+					"      })\r",
+					"    }\r",
+					"  }, (err, res) => {\r",
+					"    if (err) { console.error(\"Login error:\", err); return; }\r",
+					"    const data = res.json();\r",
+					"    const token = `Bearer ${data.access_token}`;\r",
+					"    pm.environment.set(\"token\", token);\r",
+					"    pm.environment.set(\"token_exp_ms\", Date.now() + (data.expires_in * 1000 || 300000)); // fallback 5 min\r",
+					"  });\r",
+					"}*/\r",
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"requests": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "https://jsonplaceholder.typicode.com"
+		},
+		{
+			"key": "created_post_id",
+			"value": 101
+		},
+		{
+			"key": "first_post_id",
+			"value": 1
+		},
+		{
+			"key": "postsSchema",
+			"value": "{\n  \"type\": \"object\",\n  \"required\": [\"userId\", \"id\", \"title\", \"body\"],\n  \"properties\": {\n    \"userId\": { \"type\": \"number\", \"minimum\": 1 },\n    \"id\":     { \"type\": \"number\", \"minimum\": 1 },\n    \"title\":  { \"type\": \"string\", \"minLength\": 1 },\n    \"body\":   { \"type\": \"string\", \"minLength\": 1 }\n  },\n  \"additionalProperties\": true\n}"
+		}
+	]
+}

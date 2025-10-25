@@ -1,0 +1,23 @@
+[
+  {
+    "case": "Tipos inválidos (userId string, body number)",
+    "userId": "uno",
+    "title": "titulo valido",
+    "body": 12345,
+    "expect": 422
+  },
+  {
+    "case": "Campos vacíos (title/body)",
+    "userId": 1,
+    "title": "",
+    "body": "",
+    "expect": 400
+  },
+  {
+    "case": "Longitud fuera de rango (title min 1, body min 10)",
+    "userId": 1,
+    "title": "",
+    "body": "corto",
+    "expect": 422
+  }
+]

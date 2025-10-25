@@ -1,0 +1,5 @@
+[
+  { "case": "post válido 1", "expectStatus": 201, "userId": 1, "title": "Título A", "body": "Cuerpo A", "expectSchemaOk": true },
+  { "case": "post válido 2", "expectStatus": 201, "userId": 2, "title": "Título B", "body": "Cuerpo B", "expectSchemaOk": true },
+  { "case": "título vacío (negativo demo)", "expectStatus": 201, "userId": 3, "title": "", "body": "Cuerpo C", "expectSchemaOk": false }
+]
