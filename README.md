@@ -79,18 +79,17 @@ npm install -g newman newman-reporter-htmlextra
 
 
 
-⚙️ Ejecución automática (scripts npm)
+### ⚙️ Script y Descripción
 
-Cada entorno cuenta con su propio script:
+| Script       | Descripción                                         |
+|--------------|-----------------------------------------------------|
+| `test:dev`   | Ejecuta colección completa en entorno **Dev**       |
+| `test:qa`    | Ejecuta colección completa en **QA**                |
+| `test:qa-sim`| Ejecuta negativos simulados (**QA Simulated**)      |
+| `test:prod`  | Ejecuta colección completa en **Prod**              |
+| `test:flow`  | Ejecuta solo el folder **“Flow DDT”**               |
+| `test:all`   | Ejecuta todos los anteriores en cadena              |
 
-Script y Descripción
-
-test:dev	   Ejecuta colección completa en entorno Dev
-test:qa	     Ejecuta colección completa en QA
-test:qa-sim	 Ejecuta negativos simulados (QA Simulated)
-test:prod	   Ejecuta colección completa en Prod
-test:flow	   Ejecuta solo el folder “Flow DDT”
-test:all	   Ejecuta todos los anteriores en cadena
 
 
 
