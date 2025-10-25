@@ -1,8 +1,8 @@
-name: API Tests – QA + Pages
+name: API Tests – JsonPlaceholder (QA)
 
 on:
   push:
-    branches: [ main ]
+    branches: [ "main" ]
   workflow_dispatch:
 
 permissions:
@@ -10,58 +10,50 @@ permissions:
   pages: write
   id-token: write
 
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
-
 jobs:
-  run:
+  run-and-publish:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
     steps:
-      - name: Checkout repo
+      - name: 📥 Checkout repo
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: 🔧 Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Install Newman + HTML reporter
-        run: npm install -g newman newman-reporter-htmlextra
+      - name: 📦 Install Newman + HTML reporter
+        run: npm i -g newman newman-reporter-htmlextra
 
-      - name: Run QA tests (Newman)
+      - name: 🧪 Run Newman (Contrato + Auth Smoke)
         run: >
           newman run ./jsonplaceholder_tests.postman_collection.json
           -e ./qa.postman_environment.json
+          --folder "Auth Smoke"
+          --folder "Contrato"
           --reporters cli,htmlextra
-          --reporter-htmlextra-title "API JsonPlaceholder – QA Run"
+          --reporter-htmlextra-title "API JsonPlaceholder – QA (Contrato + Smoke)"
           --reporter-htmlextra-export ./report.html
 
-      # (opcional) Esto es para conservar el HTML como artifact "clásico"
-      - name: Upload report artifact
+      - name: 🔀 Make report the index
+        run: mv report.html index.html
+
+      - name: ⬆️ Upload artifact (backup)
         uses: actions/upload-artifact@v4
         with:
           name: newman-report
           path: report.html
 
-      # === GitHub Pages ===
-      - name: Prepare Pages bundle
-        run: |
-          mkdir -p public
-          cp report.html public/index.html
-
-      - name: Upload Pages artifact
+      - name: 📦 Upload to Pages
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./public
+          path: ./
+          if-no-files-found: error
 
-  deploy:
-    needs: run
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
+      - name: 🚀 Deploy to Pages
         id: deployment
         uses: actions/deploy-pages@v4
