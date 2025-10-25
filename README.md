@@ -34,12 +34,12 @@ npm run test:all       # ejecuta todos los anteriores
 Los reportes se generan automáticamente en la carpeta /reports/
 con nombres del tipo report_<entorno>_YYYYMMDD_HHmmss.html.
 
+---
 
+## 📊 Reporte HTML (htmlextra)
 
-📊 Reporte HTML (htmlextra)
+### El reporte incluye:
 
-
-El reporte incluye:
 
 Resumen de iteraciones, requests y assertions
 
@@ -49,7 +49,7 @@ Colores y métricas de performance
 
 Resultados separados por entorno y tipo de test
 
-
+---
 
 | Tipo de test    | Propósito                                                    | Dataset / Folder | Entorno      |
 | --------------- | ------------------------------------------------------------ | ---------------- | ------------ |
@@ -58,28 +58,29 @@ Resultados separados por entorno y tipo de test
 | **Negativos**   | Validar manejo de errores y reglas de negocio                | `Negativos`      | QA Simulated |
 | **Auth Smoke**  | Confirmar envío correcto del header Authorization            | `Auth Smoke`     | Todos        |
 
+---
 
-
-🧰 Reintentos (Retry System)
+## 🧰 Reintentos (Retry System)
 
 Cada request crítica cuenta con un sistema de reintentos automático (maxRetries = 3) que maneja errores temporales de red o status 5xx, evitando falsos negativos.
 
+---
 
-
-📦 Dependencias
+## 📦 Dependencias
 
 
 Node.js 20+
 
 Newman y newman-reporter-htmlextra
 
-Instalar con:
+### Instalar con:
 
 npm install -g newman newman-reporter-htmlextra
 
+---
 
+## ⚙️ Script y Descripción
 
-### ⚙️ Script y Descripción
 
 | Script       | Descripción                                         |
 |--------------|-----------------------------------------------------|
@@ -90,21 +91,19 @@ npm install -g newman newman-reporter-htmlextra
 | `test:flow`  | Ejecuta solo el folder **“Flow DDT”**               |
 | `test:all`   | Ejecuta todos los anteriores en cadena              |
 
+---
 
-
-
-📁 Reports
+## 📁 Reports
 
 Cada run genera un HTML independiente dentro de /reports/.
 
-Los nombres siguen el formato:
+### Los nombres siguen el formato:
 
 report_<entorno>_YYYYMMDD_HHmmss.html
 
+---
 
-
-
-🧠 Autor
+## 🧠 Autor
 
 Fernando Quintela
 QA Automation Engineer / Postman–Newman Enthusiast
@@ -113,7 +112,6 @@ QA Automation Engineer / Postman–Newman Enthusiast
 
 📧 fernand.quintela@gmail.com
 
-
-
 ---
+
 📁 Repositorio de práctica – Pruebas automatizadas sobre API REST.
