@@ -34,7 +34,7 @@ jobs:
           newman run ./jsonplaceholder_tests.postman_collection.json
           -e ./qa.postman_environment.json
           --folder "Auth Smoke"
-          --folder "Contrato"
+          --folder "Contrato/Contrato Lectura"
           --reporters cli,htmlextra
           --reporter-htmlextra-title "API JsonPlaceholder – QA (Contrato + Smoke)"
           --reporter-htmlextra-export ./report.html
