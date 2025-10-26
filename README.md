@@ -103,6 +103,24 @@ report_<entorno>_YYYYMMDD_HHmmss.html
 
 ---
 
+## 🧩 Integración Continua (CI/CD)
+
+Este proyecto ejecuta pruebas automatizadas de API mediante **GitHub Actions**, con generación y despliegue automático de reportes en **GitHub Pages**.
+
+Cada ejecución (push o manual) dispara un workflow que:
+1. Instala dependencias (`Node.js`, `Newman`, `htmlextra`).
+2. Corre las suites configuradas (Contrato + Smoke).
+3. Genera un reporte HTML.
+4. Publica automáticamente el resultado en línea.
+
+🔘 **Ejecución manual:**  
+Desde la pestaña **Actions**, seleccionar el workflow `api-tests.yml` y presionar **“Re-run all jobs”** para regenerar el reporte.
+
+📄 **Último reporte publicado:**  
+👉 [Ver reporte QA en vivo](https://fernandoquintela.github.io/api-testing-jsonplaceholder/)
+
+---
+
 ## 🧠 Autor
 
 Fernando Quintela
