@@ -124,7 +124,7 @@
 									"pm.variables.set(\"patch_title\", `Título parcheado ${it.get(\"case\")}`);\r",
 									"\r",
 									"// 8) Saltar a PATCH\r",
-									"postman.setNextRequest(\"PATCH /posts (DDT)\");\r",
+									"pm.execution.setNextRequest(\"PATCH /posts (DDT)\");\r",
 									"\r",
 									"// El RETRY HANDLER\r",
 									"const code = pm.response.code;\r",
@@ -137,7 +137,7 @@
 									"    pm.variables.set(\"retry_count\", nextTry);\r",
 									"\r",
 									"    // volver a ejecutar el mismo request\r",
-									"    postman.setNextRequest(pm.info.requestName);\r",
+									"    pm.execution.setNextRequest(pm.info.requestName);\r",
 									"} else {\r",
 									"    // si todo salió bien, se resetea el contador y sigue normal\r",
 									"    pm.variables.unset(\"retry_count\");\r",
@@ -161,7 +161,7 @@
 									"// Si ya falló varias veces, que no siga\r",
 									"if (currentRetry >= maxRetries) {\r",
 									"    console.warn(`❌ Request falló ${maxRetries} veces, abortando...`);\r",
-									"    postman.setNextRequest(null);\r",
+									"    pm.execution.setNextRequest(null);\r",
 									"} else {\r",
 									"    // guardo el contador actualizado (por seguridad)\r",
 									"    pm.variables.set(\"retry_count\", currentRetry);\r",
@@ -242,7 +242,7 @@
 									"}\r",
 									"\r",
 									"// 5) Ir a DELETE\r",
-									"postman.setNextRequest(\"DELETE /posts (DDT)\");\r",
+									"pm.execution.setNextRequest(\"DELETE /posts (DDT)\");\r",
 									""
 								],
 								"type": "text/javascript",
@@ -341,7 +341,7 @@
 									"\r",
 									"// 4) Fin de la iteración\r",
 									"console.log(\"Fin del flujo DDT para este caso\");\r",
-									"postman.setNextRequest(null);\r",
+									"pm.execution.setNextRequest(null);\r",
 									""
 								],
 								"type": "text/javascript",
@@ -498,6 +498,14 @@
 		{
 			"name": "Contrato",
 			"item": [
+				{
+					"name": "Contrato Lectura",
+					"item": []
+				},
+				{
+					"name": "Contrato escritura",
+					"item": []
+				},
 				{
 					"name": "/posts",
 					"event": [
